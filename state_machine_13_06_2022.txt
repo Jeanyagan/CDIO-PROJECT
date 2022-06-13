@@ -1,0 +1,156 @@
+#include <AccelStepper.h>
+
+void findPlace();
+void placeCard();
+void error();
+void findCard_moveDown();
+void findCard_sucktion();
+void findCard_lift();
+
+const int stepX = 2;
+const int dirX = 5;
+const int stepY = 3;
+const int dirY = 6;
+const int stepZ = 4;
+const int dirZ = 7;
+const int stepA = 12;
+const int dirA = 13;
+
+int endstop_bottom_sensor = 50;    // bund
+int endstop_top_sensor = 52;    // top
+int endstop_sucktion_sensor = 48;    // suge
+
+bool check = false;
+String terminal;
+
+int main_state = 2;
+int findCard_state = 1;
+  
+// Define a stepper and the pins it will use
+AccelStepper stepperX(AccelStepper::DRIVER, stepX, dirX); // Defaults to AccelStepper::FULL4WIRE 
+AccelStepper stepperY(AccelStepper::DRIVER, stepY, dirY); // Defaults to AccelStepper::FULL4WIRE 
+AccelStepper stepperZ(AccelStepper::DRIVER, stepZ, dirZ); // Defaults to AccelStepper::FULL4WIRE 
+AccelStepper stepperA(AccelStepper::DRIVER, stepA, dirA); // Defaults to AccelStepper::FULL4WIRE 
+ 
+void setup()
+{  
+  delay(1000);
+  stepperA.setMaxSpeed(900);                  // used by run() - motor accelerates up to this value
+  stepperA.setAcceleration(800);             
+  stepperA.setCurrentPosition(0);             // Resets current position of motor to 0 position (also sets motor speed to 0) 
+  delay(3000);
+
+  pinMode(endstop_bottom_sensor, INPUT);
+  pinMode(endstop_top_sensor, INPUT);
+  pinMode(endstop_sucktion_sensor, INPUT);
+  Serial.begin(115200);
+}
+
+void loop()
+{
+
+  switch(main_state)      // find kort, tag kort, find plads, læg plads
+  {
+    case 1:          // FIND KORT
+      Serial.println("STATE: FIND CARD");
+      break;
+    case 2:          // TAG KORT
+      if (findCard_state == 1) {
+      Serial.println("STATE: TAKE CARD");
+      }
+      takeCard();
+      break;
+    case 3:          // FIND PLADS
+      Serial.println("STATE: FIND PLACE");
+      while (1) {}
+      break;       
+    case 4:          // LÆG PLADS
+      Serial.println("STATE: PLACE CARD");
+      break;
+    case 5:          // ERROR
+      Serial.println("STATE: ERROR");
+      break;
+  }
+}
+
+void findCard() {}
+
+void takeCard() {
+
+  switch(findCard_state)      
+  {
+    case 1:        // MOVE DOWN 
+      Serial.println("\tFind_Card sub-state: MOVE DOWN"); 
+      findCard_moveDown();
+         
+      break;
+    case 2:        // SUCKTION 
+      Serial.println("\tFind_Card sub-state: SUCKTION");   
+      findCard_sucktion();
+      
+      findCard_state = 3;     
+      break;
+    case 3:        // LIFT   
+      Serial.println("\tFind_Card sub-state: LIFT"); 
+      findCard_lift();
+      
+      findCard_state = 1;  
+      main_state = 3;      
+      break;       
+  }
+  }
+
+void findPlace() {}
+
+void placeCard() {}
+
+void error() {}
+
+void findCard_moveDown() {
+  Serial.println("\t\tMoves down");
+  stepperA.move(-1000);
+  while (stepperA.currentPosition() != -1000) {
+      stepperA.run();
+      if (digitalRead(endstop_bottom_sensor) == LOW) {
+            Serial.println("\t\t\tSENSOR: bottom sensor activated");
+            break;
+        }
+      else if (digitalRead(endstop_sucktion_sensor) == LOW) {
+            Serial.println("\t\t\tSENSOR: sucktion sensor activated");
+            findCard_state = 2;
+            break;      
+        } 
+      }
+      stepperA.setCurrentPosition(0);
+    }
+
+
+void findCard_sucktion() {
+  Serial.println("\t\tSucktion");
+  while (1) {  
+          
+          if (Serial.available()) {
+            terminal = Serial.readStringUntil('\n');          
+          }
+          
+          if (strcmp(String(terminal).c_str(), "OK") == 0) {
+            findCard_state = 3;   
+            break;  
+          }
+}
+
+}
+
+void findCard_lift() {
+   Serial.println("\t\tLift");
+   stepperA.move(1000);
+   while (stepperA.currentPosition() != 1000) {
+      stepperA.run();
+      if (digitalRead(endstop_top_sensor) == LOW) {
+            check = true;
+            break;  
+        } 
+    }  
+}
+
+
