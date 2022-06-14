@@ -1,0 +1,210 @@
+#include <AccelStepper.h>
+
+void findPlace();
+void placeCard();
+void error();
+void takeCard_moveDown();
+void takeCard_sucktion();
+void takeCard_lift();
+
+const int stepX = 2;
+const int dirX = 5;
+const int stepY = 3;
+const int dirY = 6;
+const int stepZ = 4;
+const int dirZ = 7;
+const int stepA = 12;
+const int dirA = 13;
+
+int endstop_sucktion_sensor = 48;    // suge
+int endstop_bottom_sensor = 50;      // bund
+int endstop_top_sensor = 52;         // top
+
+bool check = false;
+String terminal;
+int main_state = 1;
+int takeCard_state = 1;
+
+float discPositionSteps[7] = {87.5, 175, 262.5, 350, -262.5, -175, -87.5};
+int currentPlacement = 0;
+String userInput;
+
+AccelStepper stepperX_TOP(AccelStepper::DRIVER, stepX, dirX); // Defaults to AccelStepper::FULL4WIRE    // Define a stepper and the pins it will use
+AccelStepper stepperY_MIDDLE(AccelStepper::DRIVER, stepY, dirY); // Defaults to AccelStepper::FULL4WIRE 
+AccelStepper stepperZ_BOTTOM(AccelStepper::DRIVER, stepZ, dirZ); // Defaults to AccelStepper::FULL4WIRE 
+AccelStepper stepperA_SUCKTION(AccelStepper::DRIVER, stepA, dirA); // Defaults to AccelStepper::FULL4WIRE 
+ 
+void setup()
+{  
+/*
+  stepperX_TOP.setMaxSpeed(0);             // used by run() - motor accelerates up to this value
+  stepperX_TOP.setAcceleration(0);             
+  stepperX_TOP.setCurrentPosition(0);        // Resets current position of motor to 0 position (also sets motor speed to 0) 
+
+  stepperY_MIDDLE.setMaxSpeed(0);             // used by run() - motor accelerates up to this value
+  stepperY_MIDDLE.setAcceleration(0);             
+  stepperY_MIDDLE.setCurrentPosition(0);        // Resets current position of motor to 0 position (also sets motor speed to 0) 
+*/
+  stepperZ_BOTTOM.setMaxSpeed(400);             // used by run() - motor accelerates up to this value
+  stepperZ_BOTTOM.setAcceleration(800);             
+  stepperZ_BOTTOM.setCurrentPosition(0);        // Resets current position of motor to 0 position (also sets motor speed to 0) 
+/*
+  stepperA_SUCKTION.setMaxSpeed(900);             // used by run() - motor accelerates up to this value
+  stepperA_SUCKTION.setAcceleration(800);             
+  stepperA_SUCKTION.setCurrentPosition(0);        // Resets current position of motor to 0 position (also sets motor speed to 0) 
+*/  
+  pinMode(endstop_bottom_sensor, INPUT);
+  pinMode(endstop_top_sensor, INPUT);
+  pinMode(endstop_sucktion_sensor, INPUT);
+  
+  Serial.begin(115200);
+}
+
+void loop()
+{
+  switch(main_state)      // find kort, tag kort, find plads, læg på plads
+  {
+    case 1:          // FIND KORT
+      Serial.println("STATE 1: FIND CARD");
+
+      while (Serial.available() == 0) {}         
+      userInput = Serial.readString();
+     
+      motorChangePosition(calculateChangePosition(userInput.toInt()));
+      
+      break;     
+    case 2:          // TAG KORT
+      if (takeCard_state == 1) {
+        Serial.println("STATE 2: TAKE CARD");
+      }
+      takeCard();
+      break;
+    case 3:          // FIND PLADS
+      Serial.println("STATE 3: FIND PLACE");
+      while (1) {}
+      break;       
+    case 4:          // LÆG PÅ PLADS
+      Serial.println("STATE 4: PLACE CARD");
+      break;
+    case 5:          // ERROR
+      Serial.println("STATE 5: ERROR");
+      break;
+  }
+}
+
+void findCard() {}
+
+void takeCard() {
+  switch(takeCard_state)      
+  {
+    case 1:        // MOVE DOWN 
+      Serial.println("\tTake_Card sub-state 1: MOVE DOWN"); 
+      takeCard_moveDown();      
+      break;
+    case 2:        // SUCKTION 
+      Serial.println("\tTake_Card sub-state 2: SUCKTION");   
+      takeCard_sucktion();           
+      break;
+    case 3:        // LIFT   
+      Serial.println("\tTake_Card sub-state 3: LIFT"); 
+      takeCard_lift();     
+      takeCard_state = 1;  
+      main_state = 3;      
+      break;       
+  }
+}
+
+void findPlace() {}
+
+void placeCard() {}
+
+void error() {}
+
+void takeCard_moveDown() {
+  Serial.println("\t\tMoves down");
+  stepperA_SUCKTION.move(-1000);
+  while (stepperA_SUCKTION.currentPosition() != -1000) {
+      stepperA_SUCKTION.run();
+      if (digitalRead(endstop_bottom_sensor) == LOW) {
+            Serial.println("\t\t\tSENSOR: bottom sensor activated");
+            break;
+        }
+      else if (digitalRead(endstop_sucktion_sensor) == LOW) {
+            Serial.println("\t\t\tSENSOR: sucktion sensor activated");
+            takeCard_state = 2;
+            break;      
+        } 
+      }
+      stepperA_SUCKTION.setCurrentPosition(0);
+    }
+
+
+void takeCard_sucktion() {
+  Serial.println("\t\tSucktion");
+  while (1) {         
+          if (Serial.available()) {
+            terminal = Serial.readStringUntil('\n');          
+          }         
+          if (strcmp(String(terminal).c_str(), "OK") == 0) {
+            takeCard_state = 3;   
+            break;  
+          }
+  }
+}
+
+void takeCard_lift() {
+   Serial.println("\t\tLift");
+   stepperA_SUCKTION.move(1000);
+   while (stepperA_SUCKTION.currentPosition() != 1000) {
+      stepperA_SUCKTION.run();
+      if (digitalRead(endstop_top_sensor) == LOW) {
+            check = true;
+            break;  
+        } 
+    }  
+}
+
+int calculateChangePosition(int destination) {
+
+  int tmpHolder;
+  float amountOfSteps;
+  int distance; 
+
+  distance = destination - currentPlacement;
+
+  Serial.print("\t\tCalculating Movement: Destination: [");
+  Serial.print(destination);
+  Serial.print("] Current Placement: [");
+  Serial.print(currentPlacement);
+  Serial.print("] Distance: [");
+  Serial.print(distance);
+  Serial.println("]");
+
+  if (distance < 0) {
+    tmpHolder = -(distance);
+  } else {
+    tmpHolder = distance;
+  }
+
+  amountOfSteps = discPositionSteps[tmpHolder - 1];
+
+  if (distance < 0) {
+    amountOfSteps = amountOfSteps * -1;
+  }
+  
+  Serial.print("\t\tCalculating Movement: Returning amount of steps: [");
+  Serial.print(amountOfSteps);
+  Serial.println("]");
+
+  currentPlacement = destination;
+  return amountOfSteps;
+}
+
+void motorChangePosition(int amountOfSteps) {
+  stepperZ_BOTTOM.move(amountOfSteps);
+    while (stepperZ_BOTTOM.currentPosition() != amountOfSteps) {
+      stepperZ_BOTTOM.run();
+    }  
+    
+    stepperZ_BOTTOM.setCurrentPosition(0);                
+}
