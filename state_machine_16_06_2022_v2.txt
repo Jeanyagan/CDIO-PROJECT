@@ -50,6 +50,7 @@ int pos = 0;
 bool cardLifted = false;
 bool movementDone = true;
 bool messageProtocolOver;
+bool computerVisionInitiated = false;
 
 
 
@@ -150,11 +151,16 @@ void move_state_machine() {
       main_state = 4;
       break;       
     case 4:
-      if (dropCard_state == 1) {          
-        Serial.println("STATE 4: PLACE CARD");
-      }
-      dropCard_state_machine();
+      if (computerVisionInitiated == false) {          
+        if (dropCard_state == 1) {
+          Serial.println("STATE 4: PLACE CARD");
+        }
+        dropCard_state_machine();
+      } else {
+        Serial.println("STATE 4: VISION");
 
+        
+      }
       break;
     case 5:          
       Serial.println("STATE 5: ERROR");
@@ -490,6 +496,12 @@ void serialCommunicationProtocol() {
         destination[0] = charBuf[4];
         destination[1] = charBuf[6];
 
+        if (destination[0] == 0 && destination[1] == 0) {
+          Serial.println("UNKNOWN CARD REQUESTED");
+          Serial.println("Camera Vision to be initialized");
+          computerVisionInitiated = true;
+        }
+        
         //dataFromRaspberryPi = "";
         messageProtocolOver = true;
         machine_state = 3;
